@@ -1,0 +1,18 @@
+openai==0.28
+playsound
+pyttsx3
+colorama
+pyautogui
+requests
+tk
+selenium
+webbrowser
+psutil
+
+
+opencv-python
+face_recognition
+cmake
+dlib
+
+Visual Studio for C++.

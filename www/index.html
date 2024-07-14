@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lara Assistant Version 1.0.0</title>
+    <link rel="icon" href="assets/chatbot.png" type="image/x-icon">
+
+    <link rel="stylesheet" href="static/css/style.css">
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" rel="stylesheet">
+
+    
+    <script type="text/javascript" src="/eel.js"></script>
+
+    <script>
+       
+
+       
+            eel.fetch_user_data("Name")(function(result) {
+                if (result) {
+                    // If a name is returned, show welcome message
+                    document.querySelector('.form-container').style.display = 'none';
+                    document.querySelector('.welcome-container').style.display = 'block';
+                    document.querySelector('.listening-text').innerText = `Welcome back to LARA Assistant, ${result}!`;
+
+                
+                } else {
+                    // Otherwise, show the form
+                    document.querySelector('.form-container').style.display = 'block';
+                }
+            });
+      
+
+        eel.expose(update_ui_command);
+        function update_ui_command(command) {
+            // Update your UI with the command
+            console.log(command);
+            document.getElementById('command').innerText = command;
+        }
+
+        eel.expose(update_ui_response);
+        function update_ui_response(response) {
+            // Update your UI with the response
+            document.getElementById('response').innerText = response;
+        }
+
+        window.onbeforeunload = function() {
+            eel.close_program();
+        };
+
+        eel.expose(close_window);
+        function close_window() {
+            eel.close_program(); // Close the Python program
+            window.close(); // Close the browser tab
+        }
+    </script>
+</head>
+<body class=" bg-gray-900 flex flex-col items-center">
+ 
+    <div class="welcome-container">
+        <div class="content">
+            <div class="circle w-[100px] h-[100px] bg-white p-24 animate-pulse rounded-full "></div>
+            
+            
+        </div>
+    </div>
+    <script type="text/javascript" src="static/js/main.js"></script>
+    
+</body>
+</html>
