@@ -10,25 +10,39 @@ import subprocess
 import requests
 import eel
 import psutil
+import json
+import base64
+import hashlib
+from cryptography.fernet import Fernet, InvalidToken
+from getpass import getpass
 
 current_song_process = None
+BASE_DIR = 'data/security/credential_data'
+DATA_FILE = os.path.join(BASE_DIR, 'data.json')
+PASSCODE_FILE = os.path.join(BASE_DIR, 'passcode.key')
 general_data = 'data/general_data.txt'
+os.makedirs(BASE_DIR, exist_ok=True)
 # Function to recognize speech
 def listen():
     r = sr.Recognizer()
     with sr.Microphone() as source:
         print("Listening...")
+        # Adjust for ambient noise for better accuracy
         r.adjust_for_ambient_noise(source)
+        # Listen to the source
         audio = r.listen(source)
     
     try:
+        # Recognize speech using Google Web Speech API
         command = r.recognize_google(audio, language='en-US')
-        print(f"User said: {command}")
+        # print(f"User said: {command}")
         return command.lower()
     except sr.UnknownValueError:
+        # Error when speech is unintelligible
         print("Sorry, I didn't understand that.")
         return ""
     except sr.RequestError:
+        # Error when there's an issue with the service
         print("Sorry, my speech service is down.")
         return ""
 
@@ -195,6 +209,18 @@ def clear_terminal():
     start_sound()
     os.system('cls')
 
+def fetch_location():
+    try:
+        # Make a request to the IP geolocation service
+        response = requests.get('https://ipinfo.io/json')
+        if response.status_code != 200:
+            return {"error": f"Non-successful status code {response.status_code}"}
+        
+        data = response.json()
+        return data
+    except Exception as e:
+        return {"error": str(e)}
+
 
 
 
@@ -268,11 +294,151 @@ def update_general_data(key, value):
             else:
                 file.write(line)
 
-# @eel.expose
-# def close_program():
-#     global listening
-#     print("Closing the program...")
-#     listening = False
-#     exit_sound()
-#     eel.close()
-#     os._exit(0)
+def set_passcode():
+    speak("Please say your passcode.")
+    passcode = listen()
+    if passcode:
+        update_general_data('passcode', passcode)
+        speak("Passcode set successfully.")
+    else:
+        speak("Passcode not set.")
+
+def get_fernet_key(passcode):
+    hash = hashlib.sha256(passcode.encode()).digest()
+    return base64.urlsafe_b64encode(hash)
+
+def encrypt_data(data, passcode):
+    fernet = Fernet(get_fernet_key(passcode))
+    return fernet.encrypt(data.encode()).decode()
+
+def decrypt_data(data, passcode):
+    fernet = Fernet(get_fernet_key(passcode))
+    try:
+        return fernet.decrypt(data.encode()).decode()
+    except InvalidToken:
+        return None
+
+# Function to set passcode
+def set_passcode():
+    passcode = getpass("Set a new passcode: ")
+    with open(PASSCODE_FILE, 'w') as file:
+        file.write(passcode)
+    print("Passcode set successfully.")
+
+# Function to verify passcode
+def verify_passcode():
+    if not os.path.exists(PASSCODE_FILE):
+        print("Passcode not set. Please set the passcode first.")
+        return False
+    passcode = getpass("Enter your passcode: ")
+    with open(PASSCODE_FILE, 'r') as file:
+        stored_passcode = file.read().strip()
+    return True
+
+# Function to add data
+def add_data(key, value):
+    if verify_passcode():
+        passcode = getpass("Re-enter your passcode for encryption: ")
+        if not os.path.exists(DATA_FILE):
+            data = {}
+        else:
+            with open(DATA_FILE, 'r') as file:
+                encrypted_data = file.read()
+                decrypted_data = decrypt_data(encrypted_data, passcode)
+                if decrypted_data is None:
+                    print("Invalid passcode.")
+                    return
+                data = json.loads(decrypted_data)
+        
+        data[key] = value
+        encrypted_data = encrypt_data(json.dumps(data), passcode)
+        with open(DATA_FILE, 'w') as file:
+            file.write(encrypted_data)
+        print(f"Data added for key: {key}")
+    else:
+        print("Passcode verification failed.")
+
+# Function to update data
+def update_data(key, value):
+    if verify_passcode():
+        passcode = getpass("Re-enter your passcode for encryption: ")
+        if not os.path.exists(DATA_FILE):
+            print("No data found. Use add_data to add new data.")
+            return
+        else:
+            with open(DATA_FILE, 'r') as file:
+                encrypted_data = file.read()
+                decrypted_data = decrypt_data(encrypted_data, passcode)
+                if decrypted_data is None:
+                    print("Invalid passcode.")
+                    return
+                data = json.loads(decrypted_data)
+        
+        if key in data:
+            data[key] = value
+            encrypted_data = encrypt_data(json.dumps(data), passcode)
+            with open(DATA_FILE, 'w') as file:
+                file.write(encrypted_data)
+            print(f"Data updated for key: {key}")
+        else:
+            print(f"No existing data found for key: {key}")
+
+def get_data(key):
+    if verify_passcode():
+        passcode = getpass("Re-enter your passcode for decryption: ")
+        if not os.path.exists(DATA_FILE):
+            print("No data found.")
+            return None
+        else:
+            with open(DATA_FILE, 'r') as file:
+                encrypted_data = file.read()
+                decrypted_data = decrypt_data(encrypted_data, passcode)
+                if decrypted_data is None:
+                    print("Invalid passcode.")
+                    return None
+                data = json.loads(decrypted_data)
+        
+        if key in data:
+            return data[key]
+        else:
+            print(f"No data found for key: {key}")
+            return None
+    else:
+        print("Passcode verification failed.")
+        return None
+    
+def get_all_data():
+    if verify_passcode():
+        passcode = getpass("Re-enter your passcode for decryption: ")
+        if not os.path.exists(DATA_FILE):
+            print("No data found.")
+            return {}
+        else:
+            with open(DATA_FILE, 'r') as file:
+                encrypted_data = file.read()
+                decrypted_data = decrypt_data(encrypted_data, passcode)
+                if decrypted_data is None:
+                    print("Invalid passcode.")
+                    return {}
+                data = json.loads(decrypted_data)
+        
+        return data
+    else:
+        print("Passcode verification failed.")
+        return {}
+    
+def change_passcode():
+    if verify_passcode():
+        current_passcode = getpass("Re-enter your current passcode: ")
+        
+        # Verify current passcode
+        if not verify_passcode():
+            print("Current passcode verification failed.")
+            return
+        clear_terminal()
+        new_passcode = getpass("Set a new passcode: ")
+        with open(PASSCODE_FILE, 'w') as file:
+            file.write(new_passcode)
+        print("Passcode changed successfully.")
+    else:
+        print("Passcode verification failed.")
