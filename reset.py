@@ -38,4 +38,4 @@ def update_general_data(key, value):
 def reset_first_time_user():
     update_general_data('firsttimeuser', 'true')
 
-reset_first_time_user()
+# reset_first_time_user()
